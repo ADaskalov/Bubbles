@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Talk to Bubbles</title>
+<style>
+  body{margin:0;height:100vh;font-family:system-ui,sans-serif;background:#fff7e6;
+       display:flex;flex-direction:column;align-items:center;justify-content:space-around;
+       text-align:center;overflow:hidden;user-select:none}
+  #stars{font-size:28px;min-height:36px}
+  #wrap{display:inline-block}
+  #wrap.jump{animation:jump .6s}
+  #wrap.dance{animation:dance .5s 4}
+  @keyframes jump{50%{transform:translateY(-140px)}}
+  @keyframes dance{25%{transform:rotate(-18deg)}75%{transform:rotate(18deg)}}
+  #pet{width:170px;height:170px;border-radius:50%;background:#4aa3ff;position:relative;
+       transition:transform .5s,background .4s;box-shadow:0 10px 0 rgba(0,0,0,.1)}
+  .eye{position:absolute;top:50px;width:38px;height:38px;background:#fff;border-radius:50%;
+       transition:height .3s,top .3s}
+  .eye::after{content:"";position:absolute;width:16px;height:16px;background:#222;
+       border-radius:50%;left:11px;top:11px}
+  #eyeL{left:38px} #eyeR{right:38px}
+  #pet.sleep .eye{height:5px;top:66px}
+  #pet.sleep .eye::after{display:none}
+  #mouth{position:absolute;left:55px;top:105px;width:60px;height:28px;
+         border-bottom:6px solid #222;border-radius:0 0 40px 40px}
+  #card{width:120px;height:120px;border-radius:20px;display:none;margin:auto;
+        border:6px solid #fff;box-shadow:0 6px 0 rgba(0,0,0,.15)}
+  #said{font-size:20px;color:#555;min-height:28px;padding:0 16px}
+  #talk{font-size:28px;padding:22px 40px;border:none;border-radius:60px;
+        background:#ff6b6b;color:#fff;box-shadow:0 8px 0 #c94848}
+  #talk.on{background:#2ecc71;box-shadow:0 8px 0 #1f9a54}
+  #help{font-size:16px;color:#888;padding:0 12px}
+</style>
+</head>
+<body>
+  <div id="stars"></div>
+  <div id="card"></div>
+  <div id="wrap"><div id="pet"><div class="eye" id="eyeL"></div><div class="eye" id="eyeR"></div><div id="mouth"></div></div></div>
+  <div id="said">Tap the button and say "hello"!</div>
+  <button id="talk">🎤 Tap and talk</button>
+  <div id="help">Try: hello · jump · spin · dance · big · small · red · blue · sleep · wake up · play</div>
+
+<script>
+const COLORS = {red:"#ff4d4d",blue:"#4aa3ff",green:"#3ccf6e",yellow:"#ffd43b",
+                orange:"#ff9f43",purple:"#a55eea",pink:"#ff7eb6"};
+const $ = id => document.getElementById(id);
+const pet=$("pet"), wrap=$("wrap"), said=$("said"), btn=$("talk"), card=$("card");
+let size=1, rot=0, stars=0, quiz=null;
+
+function speak(text){
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang="en-US"; u.rate=0.9; u.pitch=1.4;
+  speechSynthesis.speak(u);
+}
+function move(){ pet.style.transform=`scale(${size}) rotate(${rot}deg)`; }
+function anim(cls){ wrap.className=""; void wrap.offsetWidth; wrap.className=cls; }
+function has(words, list){ return list.some(w => words.includes(w)); }
+
+function startQuiz(){
+  const names=Object.keys(COLORS);
+  quiz=names[Math.floor(Math.random()*names.length)];
+  card.style.background=COLORS[quiz]; card.style.display="block";
+  speak("What color is this?");
+}
+
+function handle(alts){
+  const words = alts.join(" ").toLowerCase().split(/\s+/);
+  said.textContent = 'You said: "' + alts[0] + '"';
+  const color = Object.keys(COLORS).find(c => words.includes(c));
+
+  if (quiz){
+    if (words.includes(quiz)){
+      stars++; $("stars").textContent="⭐".repeat(stars);
+      speak("Yes! It's " + quiz + "! Great job!");
+      anim("jump"); quiz=null; card.style.display="none"; return;
+    }
+    if (color){ speak("Hmm, not quite. Try again!"); return; }
+  }
+  if (has(words,["play","game","quiz"])) return startQuiz();
+  if (color){ pet.style.background=COLORS[color]; return speak("Now I'm " + color + "!"); }
+  if (has(words,["hello","hi","hey"])) return speak("Hello! I'm Bubbles! What's your name?");
+  if (has(words,["jump"])){ anim("jump"); return speak("Boing!"); }
+  if (has(words,["dance"])){ anim("dance"); return speak("La la la!"); }
+  if (has(words,["spin","turn"])){ rot+=360; move(); return speak("Wheee!"); }
+  if (has(words,["big","bigger","grow"])){ size=Math.min(size+0.3,2); move(); return speak("I'm big!"); }
+  if (has(words,["small","smaller","little","tiny"])){ size=Math.max(size-0.3,0.4); move(); return speak("I'm small!"); }
+  if (has(words,["sleep","night","goodnight"])){ pet.classList.add("sleep"); return speak("Good night. Zzz."); }
+  if (has(words,["wake","morning"])){ pet.classList.remove("sleep"); return speak("Good morning!"); }
+  speak("Can you say that again?");
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR){
+  said.textContent="Sorry, this browser can't hear you. Try Chrome or Safari.";
+  btn.disabled=true;
+} else {
+  const rec = new SR();
+  rec.lang="en-US"; rec.interimResults=false; rec.maxAlternatives=5;
+  rec.onresult = e => handle(Array.from(e.results[0]).map(r => r.transcript));
+  rec.onerror  = () => { said.textContent="I didn't hear you. Try again!"; };
+  rec.onend    = () => { btn.classList.remove("on"); btn.textContent="🎤 Tap and talk"; };
+  btn.onclick  = () => {
+    speechSynthesis.cancel();
+    try { rec.start(); btn.classList.add("on"); btn.textContent="👂 Listening..."; } catch(e){}
+  };
+}
+</script>
+</body>
+</html>
